@@ -12,6 +12,48 @@ class APITester:
         self.log_file = log_file
         self.endpoints_tested = set()
 
+    def setup_real_ids(self):
+        """Create real resources and return a dictionary of real IDs for use in tests."""
+        real_ids = {}
+
+        if not self.token:
+            return real_ids
+
+        headers = {"Authorization": f"Bearer {self.token}"}
+
+        # Get real user ID via GET /users/me
+        try:
+            res = requests.get(
+                f"{self.base_url}/users/me",
+                headers=headers,
+                timeout=10
+            )
+            if res.status_code == 200:
+                user_data = res.json()
+                if user_data.get("id"):
+                    real_ids["user_id"] = user_data["id"]
+                    print(f"  [*] Real user_id: {real_ids['user_id']}")
+        except Exception as e:
+            print(f"  [!] Failed to get user ID: {e}")
+
+        # Create a real post to get a real post_id
+        try:
+            res = requests.post(
+                f"{self.base_url}/posts",
+                json={"body": "Test post created by agent for testing"},
+                headers=headers,
+                timeout=10
+            )
+            if res.status_code in (200, 201):
+                post_data = res.json()
+                if post_data.get("id"):
+                    real_ids["post_id"] = post_data["id"]
+                    print(f"  [*] Real post_id: {real_ids['post_id']}")
+        except Exception as e:
+            print(f"  [!] Failed to create test post: {e}")
+
+        return real_ids
+
     def run(self, tests):
         results = []
 
@@ -52,7 +94,7 @@ class APITester:
                 self.endpoints_tested.add(test["path"])
                 self._log_request(test, res)
 
-                issues = self.detector.detect(res)
+                issues = self.detector.detect(test, res)
 
                 results.append({
                     "test": test,
@@ -90,33 +132,96 @@ class APITester:
 
         return results
 
-    def run_idor_tests(self, user1_id):
-        """Test authorization: use token2 to access user1's resources."""
+    def run_idor_tests(self, real_ids=None):
+        """Test authorization: use token2 to edit/delete user1's resources."""
         results = []
         if not self.token2:
             return results
 
-        # Try to update user1's profile with user2's token
-        test = {
-            "name": "idor_update_profile",
+        if real_ids is None:
+            real_ids = {}
+
+        post_id = real_ids.get("post_id", 1)
+        headers2 = {"Authorization": f"Bearer {self.token2}"}
+
+        # IDOR Test 1: User2 tries to EDIT user1's post
+        test_edit = {
+            "name": "idor_edit_post",
             "method": "PATCH",
-            "path": "/users/me",
-            "data": {"bio": "IDOR test"},
+            "path": f"/posts/{post_id}",
+            "data": {"body": "IDOR edit by user2"},
             "auth": True
         }
-        headers = {"Authorization": f"Bearer {self.token2}"}
         try:
             res = requests.patch(
-                f"{self.base_url}/users/me",
-                json={"bio": "IDOR test"},
-                headers=headers,
+                f"{self.base_url}/posts/{post_id}",
+                json={"body": "IDOR edit by user2"},
+                headers=headers2,
                 timeout=10
             )
-            self._log_request(test, res)
-            issues = self.detector.detect(res)
-            results.append({"test": test, "response": res, "issues": issues})
-        except:
-            pass
+            self._log_request(test_edit, res)
+            issues = []
+            if res.status_code == 200:
+                issues.append({
+                    "id": f"idor-edit-post-{post_id}",
+                    "category": "authorization",
+                    "severity": "high",
+                    "endpoint": f"/posts/{post_id}",
+                    "method": "PATCH",
+                    "title": f"IDOR: User2 can edit User1's post {post_id}",
+                    "description": f"User2 was able to edit post {post_id} owned by User1. The API returned 200 instead of 403.",
+                    "evidence": {
+                        "request": {"method": "PATCH", "url": f"/posts/{post_id}", "body": {"body": "IDOR edit by user2"}},
+                        "response": {"status_code": res.status_code, "body": res.text[:500]}
+                    },
+                    "reproduction": f"PATCH /posts/{post_id} with User2's token",
+                    "expected": "403 Forbidden",
+                    "actual": f"{res.status_code} - resource was modified",
+                    "confidence": "high",
+                    "suggested_fix": "Verify resource ownership before allowing modifications"
+                })
+            results.append({"test": test_edit, "response": res, "issues": issues})
+        except Exception as e:
+            self._log_error(test_edit, str(e))
+
+        # IDOR Test 2: User2 tries to DELETE user1's post
+        test_delete = {
+            "name": "idor_delete_post",
+            "method": "DELETE",
+            "path": f"/posts/{post_id}",
+            "data": None,
+            "auth": True
+        }
+        try:
+            res = requests.delete(
+                f"{self.base_url}/posts/{post_id}",
+                headers=headers2,
+                timeout=10
+            )
+            self._log_request(test_delete, res)
+            issues = []
+            if res.status_code == 200:
+                issues.append({
+                    "id": f"idor-delete-post-{post_id}",
+                    "category": "authorization",
+                    "severity": "high",
+                    "endpoint": f"/posts/{post_id}",
+                    "method": "DELETE",
+                    "title": f"IDOR: User2 can delete User1's post {post_id}",
+                    "description": f"User2 was able to delete post {post_id} owned by User1. The API returned 200 instead of 403.",
+                    "evidence": {
+                        "request": {"method": "DELETE", "url": f"/posts/{post_id}"},
+                        "response": {"status_code": res.status_code, "body": res.text[:500]}
+                    },
+                    "reproduction": f"DELETE /posts/{post_id} with User2's token",
+                    "expected": "403 Forbidden",
+                    "actual": f"{res.status_code} - resource was deleted",
+                    "confidence": "high",
+                    "suggested_fix": "Verify resource ownership before allowing deletion"
+                })
+            results.append({"test": test_delete, "response": res, "issues": issues})
+        except Exception as e:
+            self._log_error(test_delete, str(e))
 
         return results
 
@@ -134,7 +239,6 @@ class APITester:
             except:
                 statuses.append(0)
         
-        # If all requests succeeded (no 429), that's a finding
         rate_limited = any(s == 429 for s in statuses)
         if not rate_limited:
             results.append({
@@ -146,7 +250,7 @@ class APITester:
                     "endpoint": test["path"],
                     "method": test["method"],
                     "title": f"No rate limiting on {test['path']}",
-                    "description": f"Sent {burst_count} rapid requests to {test['path']} and none were rate-limited (no 429 status). This allows brute-force attacks.",
+                    "description": f"Sent {burst_count} rapid requests to {test['path']} and none were rate-limited (no 429 status).",
                     "evidence": {
                         "request": {"burst_count": burst_count, "url": url},
                         "response": {"statuses": statuses[:10]}
@@ -187,7 +291,7 @@ class APITester:
                         "endpoint": test["path"],
                         "method": "POST",
                         "title": "Double-like allowed on post",
-                        "description": "Liking the same post twice returns 200 both times. The API should reject duplicate likes or return a different status.",
+                        "description": "Liking the same post twice returns 200 both times.",
                         "evidence": {
                             "request": {"url": url, "action": "POST twice"},
                             "response": {"first_status": res1.status_code, "second_status": res2.status_code}

@@ -4,12 +4,17 @@ class APIExplorer:
     def __init__(self, base_url):
         self.base_url = base_url
 
-    def generate_tests(self, endpoint):
+    def generate_tests(self, endpoint, real_ids=None):
         path = endpoint["path"]
         method = endpoint["method"]
+        path_params = endpoint.get("path_params", [])
+        body_schema = endpoint.get("body_schema", None)
 
-        # Replace path params with valid IDs
-        resolved_path = path.replace("{user_id}", "1").replace("{post_id}", "1")
+        if real_ids is None:
+            real_ids = {}
+
+        # Replace path params dynamically using real_ids
+        resolved_path = self._resolve_path(path, path_params, real_ids)
 
         tests = []
 
@@ -18,7 +23,7 @@ class APIExplorer:
             "name": "valid_auth",
             "method": method,
             "path": resolved_path,
-            "data": self._valid_data(path, method),
+            "data": self._valid_data_from_schema(body_schema, path, method),
             "auth": True
         })
 
@@ -27,7 +32,7 @@ class APIExplorer:
             "name": "no_auth",
             "method": method,
             "path": resolved_path,
-            "data": self._valid_data(path, method),
+            "data": self._valid_data_from_schema(body_schema, path, method),
             "auth": False
         })
 
@@ -52,30 +57,23 @@ class APIExplorer:
             })
 
         # ---- 5. Nonexistent resource (404 test) ----
-        if "{post_id}" in path:
+        for param in path_params:
             tests.append({
-                "name": "nonexistent_post",
+                "name": f"nonexistent_{param}",
                 "method": method,
-                "path": path.replace("{post_id}", "999999").replace("{user_id}", "1"),
-                "data": self._valid_data(path, method),
-                "auth": True
-            })
-        if "{user_id}" in path:
-            tests.append({
-                "name": "nonexistent_user",
-                "method": method,
-                "path": path.replace("{user_id}", "999999").replace("{post_id}", "1"),
-                "data": self._valid_data(path, method),
+                "path": self._resolve_path(path, path_params, {**real_ids, param: "999999"}),
+                "data": self._valid_data_from_schema(body_schema, path, method),
                 "auth": True
             })
 
         # ---- 6. Negative/zero ID (input validation) ----
-        if "{post_id}" in path or "{user_id}" in path:
+        if path_params:
+            negative_ids = {p: "-1" for p in path_params}
             tests.append({
                 "name": "negative_id",
                 "method": method,
-                "path": path.replace("{user_id}", "-1").replace("{post_id}", "-1"),
-                "data": self._valid_data(path, method),
+                "path": self._resolve_path(path, path_params, negative_ids),
+                "data": self._valid_data_from_schema(body_schema, path, method),
                 "auth": True
             })
 
@@ -180,17 +178,57 @@ class APIExplorer:
 
         return tests
 
-    def _valid_data(self, path, method):
+    def _resolve_path(self, path, path_params, real_ids):
+        """Dynamically replace all path parameters with values from real_ids.
+        Falls back to '1' if no real ID is available for a parameter."""
+        resolved = path
+        for param in path_params:
+            placeholder = "{" + param + "}"
+            value = str(real_ids.get(param, "1"))
+            resolved = resolved.replace(placeholder, value)
+        return resolved
+
+    def _valid_data_from_schema(self, body_schema, path, method):
+        """Generate valid sample data dynamically from the body_schema.
+        Falls back to None for methods that don't send bodies."""
         if method in ("GET", "DELETE", "HEAD", "OPTIONS"):
             return None
-        if "register" in path:
-            return {"username": f"user_{uuid.uuid4().hex[:6]}", "password": "test123"}
-        if "login" in path:
-            return {"username": "alice", "password": "alice123"}
-        if "comments" in path:
-            return {"body": "Nice post!"}
-        if "posts" in path and method == "POST":
-            return {"body": "Hello world from agent"}
-        if "users/me" in path and method == "PATCH":
-            return {"bio": "Updated bio", "age": 25}
-        return {}
+
+        if not body_schema or not isinstance(body_schema, dict):
+            return {}
+
+        properties = body_schema.get("properties", {})
+        if not properties:
+            return {}
+
+        data = {}
+        for field_name, field_def in properties.items():
+            field_type = self._get_type(field_def)
+            if field_type == "string":
+                data[field_name] = f"test_{field_name}"
+            elif field_type == "integer":
+                data[field_name] = 1
+            elif field_type == "number":
+                data[field_name] = 1.0
+            elif field_type == "boolean":
+                data[field_name] = True
+            elif field_type == "array":
+                data[field_name] = []
+            elif field_type == "object":
+                data[field_name] = {}
+            else:
+                data[field_name] = f"test_{field_name}"
+
+        return data
+
+    def _get_type(self, field_def):
+        """Extract the type from a field definition, handling anyOf/oneOf."""
+        if "type" in field_def:
+            return field_def["type"]
+        # Handle anyOf (e.g., nullable fields)
+        for key in ("anyOf", "oneOf"):
+            if key in field_def:
+                for option in field_def[key]:
+                    if option.get("type") and option["type"] != "null":
+                        return option["type"]
+        return "string"

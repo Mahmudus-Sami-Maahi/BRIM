@@ -10,8 +10,46 @@ class IssueDetector:
         self.model = os.environ.get("MODEL_NAME", "meta-llama/llama-4-scout-17b-16e-instruct")
         self.api_url = "https://api.groq.com/openai/v1/chat/completions"
 
-    def detect(self, response):
-        """Analyzes a requests.Response object using Groq REST API directly."""
+    def is_suspicious(self, test, response):
+        """Fast pre-check to determine if this response warrants AI analysis.
+        Returns True if the response looks suspicious enough to call the AI."""
+        # 500 status code = server error, always suspicious
+        if response.status_code >= 500:
+            return True
+
+        # Protected endpoint returned 200 without auth
+        if not test.get("auth", True) and response.status_code == 200:
+            test_name = test.get("name", "")
+            path = test.get("path", "")
+            # Skip public endpoints that should return 200 without auth
+            if test_name == "no_auth" and not any(pub in path for pub in ["/auth/login", "/auth/register", "/"]):
+                return True
+
+        # Auth endpoint returned 200 with wrong credentials
+        test_name = test.get("name", "")
+        if test_name in ("sql_injection", "xss_attempt", "bad_types"):
+            path = test.get("path", "")
+            if ("login" in path or "register" in path) and response.status_code == 200:
+                return True
+
+        # Check response body for error indicators
+        try:
+            body_lower = response.text[:3000].lower()
+            for keyword in ("traceback", "exception", "stack"):
+                if keyword in body_lower:
+                    return True
+        except:
+            pass
+
+        return False
+
+    def detect(self, test, response):
+        """Analyzes a requests.Response object using Groq REST API directly.
+        Only calls the AI if the response is suspicious."""
+        # Fast pre-check: skip AI for boring responses
+        if not self.is_suspicious(test, response):
+            return []
+
         try:
             req = response.request
 

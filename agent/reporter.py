@@ -12,12 +12,6 @@ class Reporter:
 
     def generate(self):
         """Generate the report conforming to report.schema.json."""
-        seen_ids = set()
-        unique_findings = []
-        
-        severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
-        category_counts = {}
-
         valid_categories = [
             "status_code", "schema_contract", "endpoint_existence",
             "input_validation", "authentication", "authorization",
@@ -27,7 +21,11 @@ class Reporter:
         ]
         valid_severities = ["critical", "high", "medium", "low"]
         valid_methods = ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS", "HEAD"]
+        severity_rank = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+        confidence_rank = {"high": 3, "medium": 2, "low": 1}
 
+        # Step 1: Normalize all findings
+        normalized = []
         for f in self.findings:
             # Handle tuple/list findings from error handlers
             if isinstance(f, (tuple, list)):
@@ -53,12 +51,6 @@ class Reporter:
                 fid = fid.lower().replace(" ", "-")[:80]
             else:
                 fid = f"finding-{uuid.uuid4().hex[:6]}"
-            
-            if fid in seen_ids:
-                fid = f"{fid}-{uuid.uuid4().hex[:4]}"
-            seen_ids.add(fid)
-
-            # Normalize all required fields
             f["id"] = fid
 
             # Category
@@ -116,6 +108,51 @@ class Reporter:
                 "expected", "actual", "spec_reference", "confidence", "suggested_fix"
             ]
             f = {k: v for k, v in f.items() if k in valid_keys}
+
+            normalized.append(f)
+
+        # Step 2: Deduplicate by (endpoint + category + simplified title)
+        dedup_groups = {}
+        for f in normalized:
+            simplified_title = f["title"].lower().replace(" ", "")
+            dedup_key = (f["endpoint"], f["category"], simplified_title)
+
+            if dedup_key not in dedup_groups:
+                dedup_groups[dedup_key] = f
+            else:
+                existing = dedup_groups[dedup_key]
+                # Prefer higher severity, then higher confidence
+                existing_sev = severity_rank.get(existing["severity"], 0)
+                new_sev = severity_rank.get(f["severity"], 0)
+                existing_conf = confidence_rank.get(existing.get("confidence", "medium"), 0)
+                new_conf = confidence_rank.get(f.get("confidence", "medium"), 0)
+
+                if new_sev > existing_sev or (new_sev == existing_sev and new_conf > existing_conf):
+                    dedup_groups[dedup_key] = f
+
+        deduplicated = list(dedup_groups.values())
+
+        # Step 3: Confidence filter - remove low confidence unless severity is critical/high
+        filtered = []
+        for f in deduplicated:
+            confidence = f.get("confidence", "medium")
+            severity = f.get("severity", "low")
+            if confidence == "low" and severity not in ("critical", "high"):
+                continue  # Drop low confidence + medium/low severity
+            filtered.append(f)
+
+        # Step 4: Ensure unique IDs
+        seen_ids = set()
+        unique_findings = []
+        severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+        category_counts = {}
+
+        for f in filtered:
+            fid = f["id"]
+            if fid in seen_ids:
+                fid = f"{fid}-{uuid.uuid4().hex[:4]}"
+                f["id"] = fid
+            seen_ids.add(fid)
 
             unique_findings.append(f)
             severity_counts[f["severity"]] += 1
