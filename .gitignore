@@ -1,0 +1,16 @@
+# Virtual environment
+venv/
+.env/
+ENV/
+env/
+
+# Secrets
+.env
+*.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Output
+agent_log.txt
