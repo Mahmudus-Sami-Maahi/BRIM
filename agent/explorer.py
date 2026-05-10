@@ -127,7 +127,7 @@ class APIExplorer:
         tests.append({
             "name": "follow_self",
             "method": "POST",
-            "path": "/users/{self_id}/follow",  # Will be replaced with actual user ID
+            "path": "/users/{user_id}/follow",  # Will be replaced with actual user ID
             "data": None,
             "auth": True,
             "special": "follow_self"
@@ -137,7 +137,7 @@ class APIExplorer:
         tests.append({
             "name": "double_like",
             "method": "POST",
-            "path": "/posts/1/like",
+            "path": "/posts/{post_id}/like",
             "data": None,
             "auth": True,
             "special": "double_like"

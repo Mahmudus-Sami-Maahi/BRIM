@@ -1,26 +1,26 @@
 {
   "target": {
     "base_url": "https://backend-agent-test.onrender.com",
-    "tested_at": "2026-05-09T15:56:39.807428Z",
+    "tested_at": "2026-05-10T04:28:40.300730Z",
     "spec_version": "1.0.0",
     "agent_name": "Groq-Agent",
-    "duration_seconds": 61.55
+    "duration_seconds": 60.17
   },
   "summary": {
-    "total": 9,
+    "total": 11,
     "by_severity": {
       "critical": 0,
       "high": 4,
       "medium": 5,
-      "low": 0
+      "low": 2
     },
     "by_category": {
-      "authentication": 1,
+      "authentication": 2,
       "input_validation": 1,
       "schema_contract": 1,
       "error_handling": 2,
+      "business_logic": 2,
       "status_code": 1,
-      "business_logic": 1,
       "rate_limiting": 1,
       "authorization": 1
     },
@@ -57,15 +57,15 @@
       "category": "input_validation",
       "severity": "high",
       "title": "Improper Input Validation",
-      "description": "The API does not properly validate user input, allowing for potential security vulnerabilities.",
-      "reproduction": "Send a POST request to https://backend-agent-test.onrender.com/auth/register with malicious input",
-      "expected": "The API should validate user input and return an error for invalid data types",
-      "actual": "The API returned a 500 Internal Server Error for invalid input",
+      "description": "The API does not properly validate the input data, allowing for potential security vulnerabilities.",
+      "reproduction": "Send a POST request to https://backend-agent-test.onrender.com/auth/register with the body: {\"username\": 12345, \"password\": true, \"body\": 999, \"age\": \"not_a_number\"}",
+      "expected": "The API should validate the input data to ensure it conforms to expected formats.",
+      "actual": "The API did not validate the input data, resulting in a 500 Internal Server Error.",
       "confidence": "high",
-      "suggested_fix": "Implement proper input validation to ensure only valid data types are accepted",
+      "suggested_fix": "Implement proper input validation to ensure that the data conforms to expected formats.",
       "endpoint": "/auth/register",
       "method": "POST",
-      "id": "input_validation-c2ad29",
+      "id": "input_validation-21a9b6",
       "evidence": {
         "request": {
           "method": "POST",
@@ -80,15 +80,15 @@
       "category": "schema_contract",
       "severity": "medium",
       "title": "Inconsistent Schema",
-      "description": "The API request body contains unexpected properties (e.g., \"body\": 999) that do not match the expected schema.",
-      "reproduction": "Send a POST request to https://backend-agent-test.onrender.com/auth/register with an unexpected property",
-      "expected": "The API should return an error for unexpected properties",
-      "actual": "The API returned a 500 Internal Server Error",
-      "confidence": "medium",
-      "suggested_fix": "Update the API to handle unexpected properties or validate against a schema",
+      "description": "The API request body contains unexpected properties (\"body\": 999) and invalid data types (\"username\": 12345, \"password\": true, \"age\": \"not_a_number\").",
+      "reproduction": "Send a POST request to https://backend-agent-test.onrender.com/auth/register with the body: {\"username\": 12345, \"password\": true, \"body\": 999, \"age\": \"not_a_number\"}",
+      "expected": "The API should expect a consistent schema for the request body.",
+      "actual": "The API did not enforce a consistent schema for the request body.",
+      "confidence": "high",
+      "suggested_fix": "Define and enforce a consistent schema for the request body.",
       "endpoint": "/auth/register",
       "method": "POST",
-      "id": "schema_contract-7eb367",
+      "id": "schema_contract-031e0c",
       "evidence": {
         "request": {
           "method": "POST",
@@ -103,15 +103,61 @@
       "category": "error_handling",
       "severity": "medium",
       "title": "Inadequate Error Handling",
-      "description": "The API returns a generic Internal Server Error message without providing additional details.",
-      "reproduction": "Send a POST request to https://backend-agent-test.onrender.com/auth/register with invalid input",
-      "expected": "The API should return a detailed error message",
-      "actual": "The API returned a generic Internal Server Error message",
-      "confidence": "medium",
-      "suggested_fix": "Implement more detailed error handling and return specific error messages",
+      "description": "The API returns a generic 500 Internal Server Error without providing any additional information.",
+      "reproduction": "Send a POST request to https://backend-agent-test.onrender.com/auth/register with the body: {\"username\": 12345, \"password\": true, \"body\": 999, \"age\": \"not_a_number\"}",
+      "expected": "The API should provide more detailed error information.",
+      "actual": "The API returned a generic 500 Internal Server Error.",
+      "confidence": "high",
+      "suggested_fix": "Implement more detailed error handling and return specific error messages.",
       "endpoint": "/auth/register",
       "method": "POST",
-      "id": "error_handling-0ca29a",
+      "id": "error_handling-28f425",
+      "evidence": {
+        "request": {
+          "method": "POST",
+          "url": "https://backend-agent-test.onrender.com/auth/register"
+        },
+        "response": {
+          "status_code": 500
+        }
+      }
+    },
+    {
+      "category": "authentication",
+      "severity": "low",
+      "title": "Potential Authentication Issue",
+      "description": "The API does not appear to implement authentication for the register endpoint.",
+      "reproduction": "Send a POST request to https://backend-agent-test.onrender.com/auth/register with the body: {\"username\": 12345, \"password\": true, \"body\": 999, \"age\": \"not_a_number\"}",
+      "expected": "The API should implement authentication and authorization for sensitive endpoints.",
+      "actual": "The API does not appear to implement authentication for the register endpoint.",
+      "confidence": "medium",
+      "suggested_fix": "Implement authentication and authorization for sensitive endpoints.",
+      "endpoint": "/auth/register",
+      "method": "POST",
+      "id": "authentication-c97beb",
+      "evidence": {
+        "request": {
+          "method": "POST",
+          "url": "https://backend-agent-test.onrender.com/auth/register"
+        },
+        "response": {
+          "status_code": 500
+        }
+      }
+    },
+    {
+      "category": "business_logic",
+      "severity": "low",
+      "title": "Potential Business Logic Issue",
+      "description": "The API does not appear to validate the age field as a number.",
+      "reproduction": "Send a POST request to https://backend-agent-test.onrender.com/auth/register with the body: {\"username\": 12345, \"password\": true, \"body\": 999, \"age\": \"not_a_number\"}",
+      "expected": "The API should validate the age field as a number.",
+      "actual": "The API did not validate the age field as a number.",
+      "confidence": "medium",
+      "suggested_fix": "Implement business logic to validate the age field as a number.",
+      "endpoint": "/auth/register",
+      "method": "POST",
+      "id": "business_logic-cb1960",
       "evidence": {
         "request": {
           "method": "POST",
@@ -134,7 +180,7 @@
       "suggested_fix": "Verify server-side logs to determine the root cause of the error and implement a fix.",
       "endpoint": "/users/me",
       "method": "GET",
-      "id": "status_code-00aeba",
+      "id": "status_code-77901a",
       "evidence": {
         "request": {
           "method": "GET",
@@ -157,7 +203,7 @@
       "suggested_fix": "Implement a standardized error handling mechanism that provides detailed error information.",
       "endpoint": "/users/me",
       "method": "GET",
-      "id": "error_handling-0001a9",
+      "id": "error_handling-bc1b67",
       "evidence": {
         "request": {
           "method": "GET",
@@ -172,13 +218,13 @@
       "id": "biz-double-like",
       "category": "business_logic",
       "severity": "medium",
-      "endpoint": "/posts/287/like",
+      "endpoint": "/posts/353/like",
       "method": "POST",
       "title": "Double-like allowed on post",
       "description": "Liking the same post twice returns 200 both times.",
       "evidence": {
         "request": {
-          "url": "https://backend-agent-test.onrender.com/posts/287/like",
+          "url": "https://backend-agent-test.onrender.com/posts/353/like",
           "action": "POST twice"
         },
         "response": {
@@ -186,7 +232,7 @@
           "second_status": 200
         }
       },
-      "reproduction": "POST https://backend-agent-test.onrender.com/posts/287/like twice with same auth token",
+      "reproduction": "POST https://backend-agent-test.onrender.com/posts/353/like twice with same auth token",
       "expected": "Second like should return 409 or 400",
       "actual": "Second like returned 200",
       "confidence": "high",
@@ -227,24 +273,24 @@
       "suggested_fix": "Implement rate limiting on sensitive endpoints"
     },
     {
-      "id": "idor-delete-post-287",
+      "id": "idor-delete-post-353",
       "category": "authorization",
       "severity": "high",
-      "endpoint": "/posts/287",
+      "endpoint": "/posts/353",
       "method": "DELETE",
-      "title": "IDOR: User2 can delete User1's post 287",
-      "description": "User2 was able to delete post 287 owned by User1. The API returned 200 instead of 403.",
+      "title": "IDOR: User2 can delete User1's post 353",
+      "description": "User2 was able to delete post 353 owned by User1. The API returned 200 instead of 403.",
       "evidence": {
         "request": {
           "method": "DELETE",
-          "url": "/posts/287"
+          "url": "/posts/353"
         },
         "response": {
           "status_code": 200,
           "body": "{\"detail\":\"deleted\"}"
         }
       },
-      "reproduction": "DELETE /posts/287 with User2's token",
+      "reproduction": "DELETE /posts/353 with User2's token",
       "expected": "403 Forbidden",
       "actual": "200 - resource was deleted",
       "confidence": "high",

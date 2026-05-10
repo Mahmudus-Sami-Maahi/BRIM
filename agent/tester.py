@@ -281,7 +281,7 @@ class APITester:
             # Like again (should fail or be idempotent)
             res2 = requests.post(url, headers=headers, timeout=10)
 
-            if res2.status_code == 200:
+            if res2.status_code in (200, 201):
                 results.append({
                     "test": test,
                     "issues": [{
