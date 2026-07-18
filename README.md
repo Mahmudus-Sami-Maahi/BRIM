@@ -1,104 +1,210 @@
-# Backend Testing Agent — Exam
+# 🚀 Backend Testing Agent
 
-## Your Task
+An AI-powered agent designed to perform **automated black-box testing** on a live REST API using its OpenAPI specification.
 
-Build an **agent** that performs **black-box testing** of the live REST API at the
-URL provided to you, and produces a single `report.json` file describing the bugs
-your agent finds.
+This project demonstrates how intelligent agents can explore APIs, detect inconsistencies, and generate structured bug reports — with minimal human intervention.
 
-You have **3 days** from the time you receive this bundle.
+---
 
-## What You Receive
+## 📌 Overview
 
-| File | Purpose |
-|---|---|
-| `README.md` | This file |
-| `openapi.json` | The OpenAPI 3 spec for the API under test |
-| `report.schema.json` | JSON Schema your `report.json` must validate against |
+The **Backend Testing Agent** takes an API as input and autonomously:
 
-**Base URL:** `https://backend-agent-test.onrender.com`
+* Explores endpoints
+* Sends structured and edge-case requests
+* Detects unexpected behaviors
+* Generates a standardized bug report
 
-## Test accounts
-
-- `alice` / `alice123`
-- `bob` / `bob123`
-- `carol` / `carol123`
-
-Login: `POST /auth/login` with `{"username": "...", "password": "..."}` → returns `{"access_token": "..."}`. Use as `Authorization: Bearer <token>`.
-
-## What You Must Build
-
-An autonomous agent (in any language / framework you like) that:
-
-1. Takes as input: a base URL, an OpenAPI spec, and credentials
-2. Probes the API to discover bugs
-3. Emits a `report.json` file matching `report.schema.json`
-
-Your agent should be **reproducible** — running it again should produce the same
-findings (allowing for response-time variance).
-
-## Bug Categories You Should Consider
-
-Your agent should look for issues in any of the following 14 categories. Not all
-categories necessarily contain bugs. Each finding in your report MUST use one of
-these category strings:
-
-| Category | What to look for |
-|---|---|
-| `status_code` | Wrong HTTP status code returned |
-| `schema_contract` | Response shape/types don't match the OpenAPI spec |
-| `endpoint_existence` | Documented endpoint missing, or undocumented endpoint exists |
-| `input_validation` | Bad input (wrong type, out of range, missing required) not properly rejected |
-| `authentication` | Auth not enforced where it should be, or broken |
-| `authorization` | IDOR, privilege escalation, mass assignment |
-| `error_handling` | Stack traces leaked, inconsistent error formats, internal errors exposed |
-| `headers_cors` | Missing security headers, CORS misconfiguration, info disclosure headers |
-| `rate_limiting` | No rate limit, or weak/bypassable rate limit on sensitive endpoints |
-| `business_logic` | Invalid state transitions, logic flaws (e.g., follow-yourself, double-spend) |
-| `consistency` | Same field named differently across endpoints, response shape varies |
-| `performance` | Slow responses, no caching, oversize payloads |
-| `documentation_drift` | Spec says X, API does Y |
-| `http_protocol` | OPTIONS/HEAD/Accept-header issues |
-
-## Deliverable
-
-A single file:
+The output is a single file:
 
 ```
 report.json
 ```
 
-It must:
+which summarizes all discovered issues.
 
-- Validate against `report.schema.json`
-- Be UTF-8 JSON
-- Contain at least 1 finding (if your agent finds none, you're not testing hard enough)
+---
 
-You must also include:
+## ⚙️ Inputs
 
-- The source code of your agent (required)
+The agent works with the following inputs:
 
-You may optionally include:
+* **Base URL**
+  `https://backend-agent-test.onrender.com`
 
-- `agent_log.txt` — a plain-text log of the requests your agent made
+* **OpenAPI Spec**
+  Describes all endpoints and expected schemas
 
-## Submission
+* **Authentication Credentials**
 
-Push **both** `report.json` **and your agent's source code** to a **private** GitHub repo and add the following collaborators:
+  ```
+  alice / alice123
+  bob / bob123
+  carol / carol123
+  ```
 
-- `dibbo@sharif.com`
-- `farzana@sharif.com`
+### 🔐 Authentication
 
-Then share the repo link. Submission is due **3 days after the bundle is delivered**.
+Login endpoint:
 
-## Notes
+```
+POST /auth/login
+```
 
-- The API resets its state on each deploy. If you need a clean slate, just keep testing — your run is your responsibility.
-- `DELETE` operations and `PATCH` operations CAN modify state on the live target. Use the seeded test accounts.
-- Be polite — don't run sustained 1000-rps load tests; you can demonstrate rate-limit issues with a brief burst.
+Request:
 
-## Shared infrastructure
+```json
+{
+  "username": "alice",
+  "password": "alice123"
+}
+```
 
-The API is shared across multiple examinees. Use unique usernames (UUID suffix) when registering, and discover state via GET requests rather than hardcoding IDs.
+Response:
 
-Good luck.
+```json
+{
+  "access_token": "..."
+}
+```
+
+Use the token in requests:
+
+```
+Authorization: Bearer <token>
+```
+
+---
+
+## 🧠 What the Agent Does
+
+The agent is designed to be **autonomous and reproducible**.
+
+### Core Capabilities
+
+* Parses the OpenAPI specification
+* Discovers available endpoints
+* Generates valid and invalid test cases
+* Sends API requests and analyzes responses
+* Detects inconsistencies, errors, and vulnerabilities
+* Produces a structured report
+
+Running the agent multiple times should yield consistent results (except minor timing differences).
+
+---
+
+## 🐞 Bug Categories
+
+The agent detects issues across multiple dimensions:
+
+* **Status Code Issues** – Incorrect HTTP responses
+* **Schema Mismatch** – Response doesn’t match spec
+* **Missing/Extra Endpoints**
+* **Input Validation Failures**
+* **Authentication Issues**
+* **Authorization Problems (IDOR, privilege escalation)**
+* **Error Handling Leaks**
+* **Headers & CORS Misconfigurations**
+* **Rate Limiting Weaknesses**
+* **Business Logic Flaws**
+* **Data Consistency Issues**
+* **Performance Problems**
+* **Documentation Drift**
+* **HTTP Protocol Issues**
+
+---
+
+## 📊 Output
+
+### `report.json`
+
+The final output:
+
+* Must follow the provided schema
+* Contains all detected issues
+* Includes reproducible findings
+
+Example structure:
+
+```json
+{
+  "findings": [
+    {
+      "category": "status_code",
+      "endpoint": "/example",
+      "issue": "Expected 200 but got 500"
+    }
+  ]
+}
+```
+
+---
+
+## 📁 Project Structure
+
+```
+.
+├── agent/              # Your testing agent implementation
+├── openapi.json        # API specification
+├── report.schema.json  # Output validation schema
+├── report.json         # Generated report
+└── README.md
+```
+
+---
+
+## 🛠️ How to Run
+
+1. Clone the repository
+2. Install dependencies
+3. Run the agent
+
+Example:
+
+```
+python main.py
+```
+
+After execution, check:
+
+```
+report.json
+```
+
+---
+
+## 🧪 Best Practices
+
+* Use dynamic data (avoid hardcoding IDs)
+* Respect API limits (no heavy load testing)
+* Handle state changes carefully (DELETE/PATCH modify data)
+* Ensure repeatability of results
+
+---
+
+## 🌐 Notes
+
+* The API state may reset periodically
+* Multiple users may interact with the same API
+* Prefer discovery over assumptions
+
+---
+
+## 🤝 Contribution
+
+Feel free to improve:
+
+* Test coverage
+* Bug detection logic
+* Performance optimization
+* Reporting clarity
+
+---
+
+## 💡 Vision
+
+This project is a step toward fully autonomous QA systems — where AI agents can test, validate, and improve backend systems continuously.
+
+---
+
+**Build smarter. Test faster. Ship with confidence. 🚀**
